@@ -1,75 +1,92 @@
-# Intentionally Vulnerable Example Code (FOR EDUCATION ONLY)
-# Do NOT use in production.
+"""
+-------------------------------------------------------------
+WARNING: This file is intentionally vulnerable.
+It exists ONLY for testing SonarQube / SonarCloud SAST tools.
+DO NOT use in any real application.
+-------------------------------------------------------------
+"""
 
 import os
 import sqlite3
+import subprocess
+import hashlib
+import random
 
-# ❌ Hardcoded secret (Credential Exposure)
-API_KEY = "123456-SECRET-KEY"
 
-def connect_to_db():
-    # ❌ Using user-controlled path (Path Traversal)
-    db_path = input("Enter database name: ")  
-    conn = sqlite3.connect(db_path)  
-    return conn
+# -------------------------------------------------------------
+# Hardcoded secret (S2068)
+# -------------------------------------------------------------
+API_KEY = "12345-very-insecure-api-key"   # Sonar should flag this
 
-def insecure_login(conn):
-    username = input("Username: ")
-    password = input("Password: ")
 
-    cursor = conn.cursor()
+# -------------------------------------------------------------
+# SQL Injection (S3649)
+# -------------------------------------------------------------
+def get_user_password(db_path, username):
+    conn = sqlite3.connect(db_path)
+    cur = conn.cursor()
 
-    # ❌ SQL Injection vulnerability
-    query = f"SELECT * FROM users WHERE username='{username}' AND password='{password}'"
-    cursor.execute(query)
+    # ❌ Vulnerable: direct string concatenation
+    query = f"SELECT password FROM users WHERE username = '{username}';"
+    print("Executing SQL:", query)
 
-    result = cursor.fetchone()
+    cur.execute(query)  # Sonar should flag this
+    result = cur.fetchone()
+    conn.close()
+    return result
 
-    if result:
-        print("Login successful!")
-    else:
-        print("Invalid credentials")
 
-def read_file():
-    # ❌ Arbitrary file read (Path Traversal)
-    filename = input("Enter filename to read: ")
+# -------------------------------------------------------------
+# Command Injection (S4721)
+# -------------------------------------------------------------
+def run_ping(host):
+    # ❌ Vulnerable: user-controlled shell command
+    cmd = "ping -c 1 " + host
+    return subprocess.check_output(cmd, shell=True)  # Sonar should flag
+
+
+# -------------------------------------------------------------
+# Insecure eval (S2076 / S5334)
+# -------------------------------------------------------------
+def calc_user_expression(expr):
+    # ❌ Vulnerable: runs arbitrary Python
+    return eval(expr)
+
+
+# -------------------------------------------------------------
+# Path Traversal (S2083)
+# -------------------------------------------------------------
+def read_any_file(filename):
+    # ❌ No validation
     with open(filename, "r") as f:
-        print(f.read())
+        return f.read()
 
-def run_calculator():
-    print("Simple Calculator")
-    print("1.Add 2.Sub 3.Mul 4.Div")
-    choice = input("Enter choice: ")
 
-    # ❌ No input validation
-    num1 = float(input("Num1: "))
-    num2 = float(input("Num2: "))
+# -------------------------------------------------------------
+# Weak hashing (S4790)
+# -------------------------------------------------------------
+def weak_hash(data):
+    # ❌ Weak MD5 hash
+    return hashlib.md5(data.encode()).hexdigest()
 
-    # ❌ Division by zero crash
-    if choice == "4":
-        print(num1 / num2)
-    else:
-        print("Result:", num1 + num2)
 
-def insecure_system_call():
-    # ❌ Command Injection
-    cmd = input("Enter a command to run: ")
-    os.system(cmd)
+# -------------------------------------------------------------
+# Predictable random (S2245)
+# -------------------------------------------------------------
+def insecure_token():
+    # ❌ Not cryptographically secure
+    return str(random.randint(100000, 999999))
 
-def main():
-    print("1.Login 2.Read File 3.Calculator 4.Run Command")
-    option = input("Choose: ")
 
-    if option == "1":
-        conn = connect_to_db()
-        insecure_login(conn)
-    elif option == "2":
-        read_file()
-    elif option == "3":
-        run_calculator()
-    elif option == "4":
-        insecure_system_call()
-    else:
-        print("Invalid choice")
+# -------------------------------------------------------------
+# MAIN (for demonstration)
+# -------------------------------------------------------------
+if __name__ == "__main__":
+    print("=== Vulnerable Python File for Sonar Testing ===")
 
-main()
+    print(get_user_password("example.db", "admin' OR '1'='1"))
+    print(run_ping("127.0.0.1"))
+    print(calc_user_expression("2 + 5"))
+    print(read_any_file("/etc/passwd"))
+    print(weak_hash("password"))
+    print(insecure_token())
